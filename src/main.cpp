@@ -6,37 +6,37 @@
 #include <WiFiUdp.h>
 
 //Macros
-#define LED       2
+#define LED 2
 #define LED_DELAY 1000
-#define BUZZER    4
-#define BOTON     0
-#define LE        16
-#define CLK       14
-#define SDI       12
-#define OE        13
-#define TYPE      1 //Tipo de dispositivo
+#define BUZZER 4
+#define BOTON 0
+#define LE 16
+#define CLK 14
+#define SDI 12
+#define OE 13
+#define TYPE 1 //Tipo de dispositivo
 
 //FRECUENCIA DE CADA UNA DE LAS NOTAS DESDE C5 HASTA C6
-#define C5  523
+#define C5 523
 #define C5S 554
-#define D5  587
+#define D5 587
 #define D5S 622
-#define E5  659
-#define F5  698
+#define E5 659
+#define F5 698
 #define F5S 739
-#define G5  783
+#define G5 783
 #define G5S 830
-#define A5  880
+#define A5 880
 #define A5S 932
-#define B5  987
-#define C6  1046
+#define B5 987
+#define C6 1046
 
 //VALOR DE TIEMPOS DE LAS NOTAS
 #define REDONDA 2000
-#define BLANCA  REDONDA/2
-#define NEGRA   BLANCA/2
-#define CORCHEA NEGRA/2
-#define SEMICORCHEA CORCHEA/2
+#define BLANCA REDONDA / 2
+#define NEGRA BLANCA / 2
+#define CORCHEA NEGRA / 2
+#define SEMICORCHEA CORCHEA / 2
 #define SILENCIO 10
 
 //Constantes
@@ -47,19 +47,21 @@ bool reboot = false;
 bool onWiFiDisconnectedFlg = false;
 bool onWiFiGotIpFlg = false;
 int songStatus = 0;
+int zeroHour = 0;
 String deviceName;
 String pass;
 String ssid;
-unsigned long currentTime; 
+unsigned long currentTime;
 
 //Estructura
-struct MemoryData{
+struct MemoryData
+{
   String ssid;
   String pass;
   bool alarm;
   int hzone;
   int alarmHour;
-  int alarmMinute; 
+  int alarmMinute;
 } memoryData;
 
 //Objetos
@@ -85,19 +87,20 @@ void onWiFiConnected();
 void saveData();
 void serialHour(int hour, int minute);
 void soundBuzzer(int frequ, int time);
+void syncHour(int hour);
 
 //Callbacks WiFi
 void onStationGotIp(const WiFiEventStationModeGotIP &evt)
 {
-    onWiFiGotIpFlg = true;
+  onWiFiGotIpFlg = true;
 }
 
 void onStationDisconnected(const WiFiEventStationModeDisconnected &evt)
 {
-    onWiFiDisconnectedFlg = true;
+  onWiFiDisconnectedFlg = true;
 }
 
-void setup() 
+void setup()
 {
   //Inicializar pines
   pinMode(LED, OUTPUT);
@@ -108,12 +111,12 @@ void setup()
   pinMode(BOTON, INPUT);
   digitalWrite(LED, LOW);
 
-  //Definir nombre 
-  #if TYPE == 0
-    deviceName = DEVICE + "_C";
-  #else
-    deviceName = DEVICE + "_M";
-  #endif 
+//Definir nombre
+#if TYPE == 0
+  deviceName = DEVICE + "_C";
+#else
+  deviceName = DEVICE + "_M";
+#endif
 
   //Mostrar hora
   serialHour(12, 48);
@@ -132,7 +135,7 @@ void setup()
   connectToWifi();
 }
 
-void loop() 
+void loop()
 {
   //Manejar led de actividad
   handleLed();
@@ -158,10 +161,9 @@ void loop()
     ESP.reset();
   }
 
-  //Estabilizacion 
+  //Estabilizacion
   yield();
 }
-
 
 //Definición de funciones
 void connectToWifi()
@@ -191,7 +193,7 @@ void connectToWifi()
   {
     Serial.println("No hay red para conectarse");
   }
-  
+
   //Iniciar servidor UDP para identificación
   udp.begin(2400);
 }
@@ -199,14 +201,14 @@ void connectToWifi()
 void getMemoryData()
 {
   //Inicializar memoria EEPROM
-  EEPROM.begin(512); 
+  EEPROM.begin(512);
 
   String data = "";
   for (int addr = 0; addr < 512; addr++)
   {
     //Obtener caracter
     char mChar = (char)EEPROM.read(addr);
-    
+
     //Evaluar si es nulo
     if (mChar == 0)
     {
@@ -216,7 +218,7 @@ void getMemoryData()
     else
     {
       //Agregar a cadena
-      data += mChar; 
+      data += mChar;
     }
   }
 
@@ -312,7 +314,7 @@ String handleRequest(String request)
     }
     else if (key == "get_data")
     {
-      //Retornar 
+      //Retornar
       message = getData();
       status = "ok";
     }
@@ -333,27 +335,42 @@ String handleRequest(String request)
     }
     else if (key == "reboot")
     {
-      //Retornar 
+      //Retornar
       reboot = true;
       message = "Reiniciando...";
       status = "ok";
+    }
+    else if (key == "sync_hour")
+    {
+      //Obtener hora
+      if (root.containsKey("hour"))
+      {
+        syncHour(root["hour"]);
+        message = "Hora sincronizada correctamente";
+        status = "ok";
+      }
+      else
+      {
+        message = "Error al sincronizar la hora";
+        status = "error";
+      }
     }
     else
     {
       message = "invalid key";
       status = "error";
-    }  
+    }
   }
 
   //Preparar objeto JSON
   JsonObject &responseRoot = responseBuffer.createObject();
   responseRoot["message"] = message;
   responseRoot["status"] = status;
-  
+
   //Pasar a "response"
   responseRoot.prettyPrintTo(response);
 
-  //Devolver respuesta 
+  //Devolver respuesta
   return response;
 }
 
@@ -463,7 +480,7 @@ void handleTime()
   {
     //Actualizar base de tiempo
     timeRef = millis();
-    
+
     //Obtener tiempo
     time_t now;
 
@@ -475,9 +492,10 @@ void handleTime()
     Serial.println(now);
 
     //Convertir a hora leíble
-    int horas = ((now  % 86400L) / 3600);
+    int horas = ((now % 86400L) / 3600);
     int minutos = (now % 3600) / 60;
     int segundos = now % 60;
+    zeroHour = horas; // Asignar como hora sin ajuste de zona horaria
 
     //Ajustar hora
     if (memoryData.hzone != 0)
@@ -485,15 +503,17 @@ void handleTime()
       for (int i = 0; i < abs(memoryData.hzone); i++)
       {
         memoryData.hzone < 0 ? horas-- : horas++;
-        if (horas < 0) horas = 23;
-        if (horas > 23) horas = 0;
+        if (horas < 0)
+          horas = 23;
+        if (horas > 23)
+          horas = 0;
       }
     }
-    
+
     //Mostrar hora leíble
     Serial.print("time -> ");
     Serial.print(horas);
-    Serial.print(":"); 
+    Serial.print(":");
     Serial.print(minutos);
     Serial.print(":");
     Serial.print(segundos);
@@ -507,14 +527,14 @@ void handleTime()
     {
       songStatus = 1;
     }
-  } 
+  }
 }
 
 void handleUdp()
 {
   //Esperar un paquete UDP
   int packetSize = udp.parsePacket();
-  
+
   //Validar si existe alguno
   if (packetSize)
   {
@@ -535,7 +555,7 @@ void handleUdp()
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
     udp.write(replyBuffer.c_str(), replyBuffer.length());
     udp.endPacket();
-  }  
+  }
 }
 
 void handleWiFi()
@@ -576,119 +596,117 @@ void handleSong()
   static unsigned long timeRef = 0;
 
   int notas[53] = {B5, A5, G5, 0, B5, 0, B5, 0, B5, A5, G5, A5, G5, 0, G5, A5, G5, F5S, 0, B5, 0, B5, 0, B5, A5, G5, A5, G5, 0, G5, D5, 0, D5, F5S, G5,
-                   B5, 0, B5, A5, G5, A5, G5, 0, G5, C6, B5, G5, A5, G5, 0, G5, A5, G5
-                  };
+                   B5, 0, B5, A5, G5, A5, G5, 0, G5, C6, B5, G5, A5, G5, 0, G5, A5, G5};
 
   int tiempos[53] = {BLANCA, BLANCA, NEGRA, CORCHEA, SEMICORCHEA, SILENCIO, SEMICORCHEA, SILENCIO, CORCHEA, SEMICORCHEA, CORCHEA, SEMICORCHEA, CORCHEA,
                      SILENCIO, BLANCA, BLANCA, CORCHEA, CORCHEA, CORCHEA, SEMICORCHEA, SILENCIO, SEMICORCHEA, SILENCIO, CORCHEA, SEMICORCHEA, CORCHEA, SEMICORCHEA, CORCHEA,
                      SILENCIO, CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, SILENCIO, CORCHEA, CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, CORCHEA, SILENCIO, CORCHEA + SEMICORCHEA,
                      CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, SILENCIO, CORCHEA, CORCHEA + SEMICORCHEA, CORCHEA + SEMICORCHEA, CORCHEA,
-                     CORCHEA + SEMICORCHEA, CORCHEA, CORCHEA + SEMICORCHEA, BLANCA, BLANCA, REDONDA
-                    };
+                     CORCHEA + SEMICORCHEA, CORCHEA, CORCHEA + SEMICORCHEA, BLANCA, BLANCA, REDONDA};
 
   //Reproducir
   switch (songStatus)
   {
-    //STOP
-    case 0:
-      noTone(BUZZER);
-      noteidx = 0;
-      break;
+  //STOP
+  case 0:
+    noTone(BUZZER);
+    noteidx = 0;
+    break;
 
-    //PLAY
-    case 1:
-      noteidx = 0;
-      songStatus = 2;
-      break;
+  //PLAY
+  case 1:
+    noteidx = 0;
+    songStatus = 2;
+    break;
 
-    //PLAYING
-    case 2:
-      tone(BUZZER, notas[noteidx]);
-      timeRef = millis();
-      songStatus = 3;
-      break;
+  //PLAYING
+  case 2:
+    tone(BUZZER, notas[noteidx]);
+    timeRef = millis();
+    songStatus = 3;
+    break;
 
-    //SUSTAIN
-    case 3:
-      if (millis() - timeRef > tiempos[noteidx])
+  //SUSTAIN
+  case 3:
+    if (millis() - timeRef > tiempos[noteidx])
+    {
+      noteidx++;
+      if (noteidx == 53)
       {
-        noteidx++;
-        if (noteidx == 53)
-        {
-          songStatus = 0;
-        }
-        else
-        {
-          songStatus = 2;
-        }
+        songStatus = 0;
       }
-      break;
+      else
+      {
+        songStatus = 2;
+      }
+    }
+    break;
   }
 }
 
 //Mostrar la hora en ledDrivers
 void serialHour(int hour, int minute)
 {
-  #if TYPE == 0
-    byte hourH = hour / 10;
-    byte hourL = hour % 10;
-    byte minuteH = minute / 10;
-    byte minuteL = minute % 10;
+#if TYPE == 0
+  byte hourH = hour / 10;
+  byte hourL = hour % 10;
+  byte minuteH = minute / 10;
+  byte minuteL = minute % 10;
 
-    short limites[4] = {4, 3, 4, 2};
-    byte  clockData[4] = {minuteL, minuteH, hourL, hourH};
+  short limites[4] = {4, 3, 4, 2};
+  byte clockData[4] = {minuteL, minuteH, hourL, hourH};
 
-    digitalWrite(SDI, LOW);
-    digitalWrite(CLK, LOW);
-    digitalWrite(LE, LOW);
+  digitalWrite(SDI, LOW);
+  digitalWrite(CLK, LOW);
+  digitalWrite(LE, LOW);
 
-    for (int i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < limites[i]; j++)
     {
-      for (int j = 0; j < limites[i]; j++)
-      {
-        digitalWrite(SDI, clockData[i] & 0x01);
-        clockData[i] >>= 1;
+      digitalWrite(SDI, clockData[i] & 0x01);
+      clockData[i] >>= 1;
 
-        digitalWrite(CLK, HIGH);
-        delay(1);
-        digitalWrite(CLK, LOW);
-      }
+      digitalWrite(CLK, HIGH);
+      delay(1);
+      digitalWrite(CLK, LOW);
     }
+  }
 
-    digitalWrite(LE, HIGH);
-    delay(1);
-    digitalWrite(LE, LOW);
-  #else
-    byte hourH = hour / 10;
-    byte hourL = hour % 10;
-    byte minuteH = minute / 10;
-    byte minuteL = minute % 10;
+  digitalWrite(LE, HIGH);
+  delay(1);
+  digitalWrite(LE, LOW);
+#else
+  byte hourH = hour / 10;
+  byte hourL = hour % 10;
+  byte minuteH = minute / 10;
+  byte minuteL = minute % 10;
 
-    digitalWrite(SDI, LOW);
-    digitalWrite(CLK, LOW);
-    digitalWrite(LE, LOW);
+  digitalWrite(SDI, LOW);
+  digitalWrite(CLK, LOW);
+  digitalWrite(LE, LOW);
 
-    byte  clockData[4] = {hourH, hourL, minuteH, minuteL};
+  byte clockData[4] = {hourH, hourL, minuteH, minuteL};
 
-    int numPosition = 1;
+  int numPosition = 1;
 
-    for (int i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 4; j++)
     {
-      for (int j = 0; j < 4; j++)
-      {
-        digitalWrite(SDI, clockData[j] & numPosition);
+      digitalWrite(SDI, clockData[j] & numPosition);
 
-        digitalWrite(CLK, HIGH);
-        delay(1);
-        digitalWrite(CLK, LOW);
-      }
-      numPosition *= 2;
+      digitalWrite(CLK, HIGH);
+      delay(1);
+      digitalWrite(CLK, LOW);
     }
+    numPosition *= 2;
+  }
 
-    digitalWrite(LE, HIGH);
-    delay(1);
-    digitalWrite(LE, LOW);
-  #endif
+  digitalWrite(LE, HIGH);
+  delay(1);
+  digitalWrite(LE, LOW);
+#endif
 }
 
 void soundBuzzer(int frequ, int time)
@@ -698,17 +716,28 @@ void soundBuzzer(int frequ, int time)
   noTone(BUZZER);
 }
 
+void syncHour(int syncedHour)
+{
+  // Calcular nueva zona horaria
+  int newHourzone = syncedHour - zeroHour;
+  memoryData.hzone = newHourzone;
+
+  // Guardar cambios
+  saveData();
+}
+
 //{"key":"version"}
- 
+
 //{"key":"play_song"}
- 
+
 //{"key":"stop_song"}
 
 /*
-  {"key":"set_data","data":{"ssid":"AP_OFICINA","pass":"B1n4r1uM","hzone":-5,"alarm":false,"alarm_hour":13,"alarm_minute":32}}
+  {"key":"set_data","data":{"ssid":"AP_OFICINA","pass":"B1n4r1uM","hzone":-5,"alarm":true,"alarm_hour":10,"alarm_minute":00}}
 */
 
 //{"key":"get_data"}
 
 //{"key":"reboot"}
 
+//{"key":"sync_hour", "hour": 10}  **La hora debe estar en formato 24h**
