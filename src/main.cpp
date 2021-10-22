@@ -46,6 +46,7 @@ const String DEVICE = "RelojcinWifi";
 bool reboot = false;
 bool onWiFiDisconnectedFlg = false;
 bool onWiFiGotIpFlg = false;
+int pwmValue = 1024;
 int songStatus = 0;
 int zeroHour = 0;
 String deviceName;
@@ -88,6 +89,7 @@ void saveData();
 void serialHour(int hour, int minute);
 void soundBuzzer(int frequ, int time);
 void syncHour(int hour);
+void setBrightness(int pwmVal);
 
 //Callbacks WiFi
 void onStationGotIp(const WiFiEventStationModeGotIP &evt)
@@ -110,6 +112,7 @@ void setup()
   pinMode(OE, OUTPUT);
   pinMode(BOTON, INPUT);
   digitalWrite(LED, LOW);
+  setBrightness(1024);
 
 //Definir nombre
 #if TYPE == 0
@@ -244,7 +247,7 @@ void saveData()
   String jsonString = getData();
 
   //Variable que guarda la direccion de memoria actual
-  int addr;
+  int addr = 0;
 
   //Almacenar en memoria
   for (addr = 0; addr < jsonString.length(); addr++)
@@ -295,7 +298,7 @@ String handleRequest(String request)
 
     if (key == "version")
     {
-      message = "3.0.0";
+      message = "3.1.0";
       status = "ok";
     }
     else if (key == "play_song")
@@ -355,6 +358,21 @@ String handleRequest(String request)
         status = "error";
       }
     }
+    else if (key == "set_brightness") 
+    {
+      if (root.containsKey("value")) 
+      {
+        setBrightness(root["value"]);
+        saveData();
+        message = "Brillo cambiado correctamente";
+        status = "ok";
+      } 
+      else 
+      {
+        message = "Error al aplicar nuevo nivel de brillo";
+        status = "error";
+      }
+    }
     else
     {
       message = "invalid key";
@@ -389,6 +407,7 @@ String getData()
   root["alarm"] = memoryData.alarm;
   root["alarm_hour"] = memoryData.alarmHour;
   root["alarm_minute"] = memoryData.alarmMinute;
+  root["pwm_value"] = pwmValue;
 
   //Pasar a String
   root.prettyPrintTo(data);
@@ -418,6 +437,11 @@ bool setData(String data)
     memoryData.alarm = root["alarm"];
     memoryData.alarmHour = root["alarm_hour"];
     memoryData.alarmMinute = root["alarm_minute"];
+
+    if (root.containsKey("pwm_value")) {
+      int pwmValue = root["pwm_value"];
+      setBrightness(pwmValue);
+    }
   }
 
   return true;
@@ -726,6 +750,12 @@ void syncHour(int syncedHour)
   saveData();
 }
 
+void setBrightness(int pwmVal)
+{
+  analogWrite(OE, 1024 - pwmVal);
+  pwmValue = pwmVal;
+}
+
 //{"key":"version"}
 
 //{"key":"play_song"}
@@ -733,7 +763,7 @@ void syncHour(int syncedHour)
 //{"key":"stop_song"}
 
 /*
-  {"key":"set_data","data":{"ssid":"AP_OFICINA","pass":"B1n4r1uM","hzone":-5,"alarm":true,"alarm_hour":10,"alarm_minute":00}}
+  {"key":"set_data","data":{"ssid":"PG-WiFi","pass":"F@m1l14P@rr4_2409","hzone":-5,"alarm":true,"alarm_hour":10,"alarm_minute":00}}
 */
 
 //{"key":"get_data"}
@@ -741,3 +771,5 @@ void syncHour(int syncedHour)
 //{"key":"reboot"}
 
 //{"key":"sync_hour", "hour": 10}  **La hora debe estar en formato 24h**
+
+//{"key":"set_brightness", "value":50}
